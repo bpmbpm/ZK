@@ -1,0 +1,9 @@
+# GitHub Pages configuration for ZK Zettelkasten
+title: ZK — Zettelkasten
+description: Browser-based Zettelkasten app inspired by Obsidian
+theme: null
+
+# Tell GitHub Pages not to process Markdown with Jekyll
+# (we serve our own HTML)
+include:
+  - index.html
