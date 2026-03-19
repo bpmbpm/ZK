@@ -1,0 +1,2444 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ZK — Zettelkasten</title>
+<style>
+/* ===== RESET & BASE ===== */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #1e1e1e;
+  --bg2: #252526;
+  --bg3: #2d2d2d;
+  --bg4: #3c3c3c;
+  --border: #444;
+  --text: #d4d4d4;
+  --text2: #9d9d9d;
+  --accent: #569cd6;
+  --accent2: #4ec9b0;
+  --accent3: #ce9178;
+  --link: #569cd6;
+  --tag: #4ec9b0;
+  --hover: #2a2d2e;
+  --active: #094771;
+  --sidebar-w: 240px;
+  --panel-w: 280px;
+  --header-h: 40px;
+  --status-h: 24px;
+  --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --mono: 'Fira Code', 'Consolas', monospace;
+}
+[data-theme="light"] {
+  --bg: #ffffff;
+  --bg2: #f3f3f3;
+  --bg3: #e8e8e8;
+  --bg4: #d4d4d4;
+  --border: #d0d0d0;
+  --text: #1e1e1e;
+  --text2: #666;
+  --accent: #0066b8;
+  --accent2: #007066;
+  --accent3: #c07030;
+  --link: #0066b8;
+  --tag: #007066;
+  --hover: #e8e8e8;
+  --active: #cce5ff;
+}
+html, body { height: 100%; overflow: hidden; font-family: var(--font); font-size: 14px; color: var(--text); background: var(--bg); }
+
+/* ===== HEADER ===== */
+#header {
+  height: var(--header-h);
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  gap: 8px;
+  flex-shrink: 0;
+  z-index: 100;
+}
+#header .logo { font-weight: bold; font-size: 15px; color: var(--accent); margin-right: 8px; }
+#header .spacer { flex: 1; }
+.btn {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.btn:hover { background: var(--bg4); }
+.btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+.btn.primary:hover { opacity: 0.9; }
+.btn.danger { background: #c0392b; color: #fff; border-color: #c0392b; }
+.btn.danger:hover { opacity: 0.9; }
+#search-input {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 13px;
+  width: 200px;
+}
+#search-input:focus { outline: none; border-color: var(--accent); }
+#lang-toggle { cursor: pointer; font-size: 12px; }
+
+/* ===== LAYOUT ===== */
+#app { display: flex; height: calc(100vh - var(--header-h) - var(--status-h)); overflow: hidden; }
+
+/* ===== SIDEBAR (LEFT) ===== */
+#sidebar {
+  width: var(--sidebar-w);
+  background: var(--bg2);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+.sidebar-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg3);
+}
+.sidebar-tab {
+  flex: 1;
+  padding: 6px 4px;
+  text-align: center;
+  cursor: pointer;
+  font-size: 11px;
+  color: var(--text2);
+  border-bottom: 2px solid transparent;
+}
+.sidebar-tab:hover { color: var(--text); background: var(--hover); }
+.sidebar-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+.sidebar-panel { display: none; flex-direction: column; flex: 1; overflow: hidden; }
+.sidebar-panel.active { display: flex; }
+
+/* File Explorer */
+#file-explorer { flex: 1; overflow-y: auto; padding: 4px 0; }
+.file-item {
+  display: flex;
+  align-items: center;
+  padding: 3px 8px;
+  cursor: pointer;
+  border-radius: 3px;
+  margin: 1px 4px;
+  gap: 4px;
+  font-size: 13px;
+}
+.file-item:hover { background: var(--hover); }
+.file-item.active { background: var(--active); color: #fff; }
+.file-item .icon { width: 14px; flex-shrink: 0; opacity: 0.7; }
+.file-item .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.folder-item {
+  display: flex;
+  align-items: center;
+  padding: 3px 8px;
+  cursor: pointer;
+  border-radius: 3px;
+  margin: 1px 4px;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 500;
+}
+.folder-item:hover { background: var(--hover); }
+.folder-children { padding-left: 16px; }
+.file-ctx-btn {
+  opacity: 0;
+  background: none;
+  border: none;
+  color: var(--text2);
+  cursor: pointer;
+  padding: 0 2px;
+  font-size: 14px;
+  line-height: 1;
+}
+.file-item:hover .file-ctx-btn { opacity: 1; }
+.file-explorer-header {
+  display: flex;
+  align-items: center;
+  padding: 6px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text2);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.file-explorer-header .btn { padding: 2px 6px; font-size: 11px; margin-left: auto; }
+
+/* Tags panel */
+#tags-panel { flex: 1; overflow-y: auto; padding: 4px 0; }
+.tag-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 12px;
+  cursor: pointer;
+  font-size: 13px;
+}
+.tag-item:hover { background: var(--hover); }
+.tag-item .tag-name { color: var(--tag); }
+.tag-item .tag-count { font-size: 11px; color: var(--text2); background: var(--bg3); padding: 1px 6px; border-radius: 8px; }
+
+/* Search panel */
+#search-panel { flex: 1; overflow-y: auto; padding: 4px; }
+#search-box { padding: 6px 8px; }
+#search-box input { width: 100%; background: var(--bg3); border: 1px solid var(--border); color: var(--text); padding: 5px 8px; border-radius: 4px; font-size: 13px; }
+#search-box input:focus { outline: none; border-color: var(--accent); }
+.search-result { padding: 6px 8px; cursor: pointer; border-radius: 4px; margin: 1px 0; }
+.search-result:hover { background: var(--hover); }
+.search-result .result-title { font-weight: 600; font-size: 13px; }
+.search-result .result-preview { font-size: 12px; color: var(--text2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
+.search-result .result-preview mark { background: #f0e040; color: #000; border-radius: 2px; }
+
+/* ===== MAIN AREA ===== */
+#main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+.tabs-bar {
+  height: 34px;
+  background: var(--bg3);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: flex-end;
+  overflow-x: auto;
+  flex-shrink: 0;
+}
+.tabs-bar::-webkit-scrollbar { height: 3px; }
+.tab {
+  height: 30px;
+  padding: 0 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  background: var(--bg3);
+  border-top: 2px solid transparent;
+  border-right: 1px solid var(--border);
+  font-size: 13px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.tab:hover { background: var(--hover); }
+.tab.active { background: var(--bg); border-top-color: var(--accent); }
+.tab .tab-close { opacity: 0; font-size: 12px; color: var(--text2); background: none; border: none; cursor: pointer; padding: 0; }
+.tab:hover .tab-close, .tab.active .tab-close { opacity: 1; }
+.tab .tab-close:hover { color: var(--text); }
+
+#editor-area { flex: 1; overflow: hidden; position: relative; }
+.editor-pane { display: none; flex-direction: column; height: 100%; }
+.editor-pane.active { display: flex; }
+.editor-toolbar {
+  display: flex;
+  align-items: center;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border);
+  gap: 4px;
+  flex-shrink: 0;
+  background: var(--bg2);
+}
+.editor-toolbar .sep { width: 1px; height: 20px; background: var(--border); margin: 0 2px; }
+.toolbar-btn {
+  background: none;
+  border: none;
+  color: var(--text2);
+  cursor: pointer;
+  padding: 3px 6px;
+  border-radius: 3px;
+  font-size: 13px;
+}
+.toolbar-btn:hover { background: var(--hover); color: var(--text); }
+.toolbar-btn.active { background: var(--active); color: var(--text); }
+.editor-mode-toggle {
+  margin-left: auto;
+  display: flex;
+  gap: 2px;
+}
+.mode-btn {
+  background: none;
+  border: 1px solid transparent;
+  color: var(--text2);
+  cursor: pointer;
+  padding: 2px 8px;
+  border-radius: 3px;
+  font-size: 12px;
+}
+.mode-btn:hover { background: var(--hover); }
+.mode-btn.active { background: var(--bg3); border-color: var(--border); color: var(--text); }
+
+.note-editor {
+  flex: 1;
+  background: var(--bg);
+  color: var(--text);
+  border: none;
+  resize: none;
+  padding: 24px 32px;
+  font-family: var(--mono);
+  font-size: 14px;
+  line-height: 1.7;
+  outline: none;
+  overflow-y: auto;
+  width: 100%;
+}
+.note-preview {
+  flex: 1;
+  padding: 24px 32px;
+  overflow-y: auto;
+  background: var(--bg);
+  line-height: 1.7;
+}
+.note-preview h1 { font-size: 1.8em; margin: 0.8em 0 0.4em; border-bottom: 1px solid var(--border); padding-bottom: 4px; }
+.note-preview h2 { font-size: 1.4em; margin: 0.8em 0 0.4em; }
+.note-preview h3 { font-size: 1.2em; margin: 0.6em 0 0.3em; }
+.note-preview p { margin: 0.5em 0; }
+.note-preview ul, .note-preview ol { margin: 0.5em 0; padding-left: 1.5em; }
+.note-preview li { margin: 0.2em 0; }
+.note-preview code { background: var(--bg3); padding: 1px 4px; border-radius: 3px; font-family: var(--mono); font-size: 0.9em; }
+.note-preview pre { background: var(--bg3); padding: 12px 16px; border-radius: 6px; overflow-x: auto; margin: 0.8em 0; }
+.note-preview pre code { background: none; padding: 0; }
+.note-preview blockquote { border-left: 3px solid var(--accent); padding-left: 12px; color: var(--text2); margin: 0.8em 0; }
+.note-preview table { border-collapse: collapse; margin: 0.8em 0; }
+.note-preview th, .note-preview td { border: 1px solid var(--border); padding: 5px 10px; }
+.note-preview th { background: var(--bg3); }
+.note-preview hr { border: none; border-top: 1px solid var(--border); margin: 1em 0; }
+.note-preview a.wiki-link { color: var(--link); text-decoration: none; border-bottom: 1px solid transparent; }
+.note-preview a.wiki-link:hover { border-bottom-color: var(--link); }
+.note-preview a.wiki-link.broken { color: var(--text2); }
+.note-preview .tag { color: var(--tag); cursor: pointer; }
+.note-preview img { max-width: 100%; border-radius: 4px; }
+.note-preview a { color: var(--link); }
+.note-preview input[type="checkbox"] { margin-right: 6px; }
+.note-preview li.task-item { list-style: none; margin-left: -1em; }
+
+/* Empty state */
+.empty-state {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: var(--text2);
+  gap: 12px;
+}
+.empty-state h2 { color: var(--text); font-size: 20px; }
+.empty-state .hint { font-size: 13px; text-align: center; max-width: 300px; }
+
+/* ===== RIGHT PANEL (Backlinks etc.) ===== */
+#right-panel {
+  width: var(--panel-w);
+  background: var(--bg2);
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  overflow: hidden;
+  transition: width 0.2s;
+}
+#right-panel.collapsed { width: 0; overflow: hidden; }
+.panel-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg3);
+}
+.panel-tab {
+  flex: 1;
+  padding: 6px 4px;
+  text-align: center;
+  cursor: pointer;
+  font-size: 11px;
+  color: var(--text2);
+  border-bottom: 2px solid transparent;
+}
+.panel-tab:hover { color: var(--text); background: var(--hover); }
+.panel-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+.panel-content { display: none; flex-direction: column; flex: 1; overflow: hidden; }
+.panel-content.active { display: flex; }
+
+/* Backlinks */
+#backlinks-list { flex: 1; overflow-y: auto; padding: 8px 4px; }
+.backlink-item {
+  padding: 6px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-bottom: 4px;
+  border: 1px solid var(--border);
+  background: var(--bg3);
+}
+.backlink-item:hover { background: var(--hover); }
+.backlink-item .bl-title { font-weight: 600; font-size: 13px; color: var(--link); }
+.backlink-item .bl-ctx { font-size: 12px; color: var(--text2); margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.backlink-item .bl-ctx mark { background: #f0e04040; border-radius: 2px; }
+.no-backlinks { padding: 16px; color: var(--text2); font-size: 13px; text-align: center; }
+
+/* Outline */
+#outline-list { flex: 1; overflow-y: auto; padding: 4px; }
+.outline-item {
+  padding: 3px 8px;
+  cursor: pointer;
+  border-radius: 3px;
+  font-size: 13px;
+  color: var(--text2);
+}
+.outline-item:hover { background: var(--hover); color: var(--text); }
+.outline-h1 { font-weight: 700; color: var(--text); }
+.outline-h2 { padding-left: 16px; }
+.outline-h3 { padding-left: 28px; }
+.outline-h4 { padding-left: 40px; }
+
+/* ===== GRAPH VIEW ===== */
+#graph-container {
+  display: none;
+  flex-direction: column;
+  height: 100%;
+  background: var(--bg);
+}
+#graph-container.active { display: flex; }
+#graph-canvas { flex: 1; cursor: grab; }
+#graph-canvas:active { cursor: grabbing; }
+.graph-controls {
+  position: absolute;
+  bottom: 40px;
+  right: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  z-index: 10;
+}
+.graph-ctrl-btn {
+  width: 30px;
+  height: 30px;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  color: var(--text);
+  cursor: pointer;
+  border-radius: 4px;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.graph-ctrl-btn:hover { background: var(--bg4); }
+#graph-wrap { position: relative; flex: 1; overflow: hidden; }
+.graph-legend {
+  padding: 6px 12px;
+  font-size: 11px;
+  color: var(--text2);
+  border-top: 1px solid var(--border);
+  display: flex;
+  gap: 12px;
+}
+.graph-legend span { display: flex; align-items: center; gap: 4px; }
+.legend-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+
+/* ===== STATUS BAR ===== */
+#status-bar {
+  height: var(--status-h);
+  background: var(--accent);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  font-size: 12px;
+  gap: 12px;
+  flex-shrink: 0;
+  z-index: 100;
+}
+#status-bar .sep { opacity: 0.5; }
+#status-bar .right { margin-left: auto; display: flex; gap: 10px; }
+
+/* ===== MODAL ===== */
+.modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  z-index: 1000;
+  align-items: center;
+  justify-content: center;
+}
+.modal-overlay.active { display: flex; }
+.modal {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 24px;
+  min-width: 400px;
+  max-width: 600px;
+  width: 90vw;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+}
+.modal h2 { margin-bottom: 16px; font-size: 16px; }
+.modal input, .modal textarea, .modal select {
+  width: 100%;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-size: 14px;
+  font-family: var(--font);
+  margin-bottom: 12px;
+}
+.modal input:focus, .modal textarea:focus { outline: none; border-color: var(--accent); }
+.modal textarea { min-height: 120px; resize: vertical; font-family: var(--mono); }
+.modal-buttons { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
+.modal label { display: block; font-size: 12px; color: var(--text2); margin-bottom: 4px; }
+
+/* Quick switcher */
+#quick-switcher-input {
+  width: 100%;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 10px 14px;
+  border-radius: 4px;
+  font-size: 15px;
+  margin-bottom: 8px;
+}
+#quick-switcher-input:focus { outline: none; border-color: var(--accent); }
+#quick-switcher-results { max-height: 300px; overflow-y: auto; }
+.qs-item {
+  padding: 8px 12px;
+  cursor: pointer;
+  border-radius: 4px;
+  font-size: 13px;
+}
+.qs-item:hover, .qs-item.selected { background: var(--active); color: #fff; }
+
+/* GitHub auth panel */
+#github-panel { padding: 8px; }
+.github-form { display: flex; flex-direction: column; gap: 8px; padding: 8px 0; }
+.github-form input { background: var(--bg3); border: 1px solid var(--border); color: var(--text); padding: 5px 8px; border-radius: 4px; font-size: 13px; }
+.github-status { font-size: 12px; padding: 4px 8px; border-radius: 4px; }
+.github-status.ok { background: #1a5c2a; color: #4ade80; }
+.github-status.err { background: #5c1a1a; color: #f87171; }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--bg4); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--border); }
+
+/* Autocomplete dropdown */
+#autocomplete {
+  position: fixed;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  z-index: 500;
+  max-height: 200px;
+  overflow-y: auto;
+  min-width: 200px;
+  display: none;
+}
+.ac-item {
+  padding: 6px 12px;
+  cursor: pointer;
+  font-size: 13px;
+}
+.ac-item:hover, .ac-item.selected { background: var(--active); color: #fff; }
+
+/* Notification */
+#notification {
+  position: fixed;
+  bottom: 40px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 13px;
+  z-index: 2000;
+  opacity: 0;
+  transition: opacity 0.3s;
+  pointer-events: none;
+}
+#notification.show { opacity: 1; }
+
+/* Header note title */
+.note-title-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg2);
+  flex-shrink: 0;
+}
+.note-title-input {
+  flex: 1;
+  background: none;
+  border: none;
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 600;
+  outline: none;
+}
+.note-title-input::placeholder { color: var(--text2); }
+.note-meta { font-size: 11px; color: var(--text2); display: flex; gap: 10px; }
+
+/* Resizable dividers */
+.resizer {
+  width: 4px;
+  background: transparent;
+  cursor: col-resize;
+  flex-shrink: 0;
+}
+.resizer:hover { background: var(--accent); }
+
+/* Graph tooltip */
+#graph-tooltip {
+  position: fixed;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  pointer-events: none;
+  z-index: 1000;
+  display: none;
+}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div id="header">
+  <span class="logo">ZK</span>
+  <button class="btn primary" id="btn-new-note" title="Ctrl+N">+ <span data-i18n="newNote">New Note</span></button>
+  <button class="btn" id="btn-graph" title="Ctrl+G">⬡ <span data-i18n="graph">Graph</span></button>
+  <button class="btn" id="btn-quick-open" title="Ctrl+P">⌕ <span data-i18n="quickOpen">Quick Open</span></button>
+  <div class="spacer"></div>
+  <input type="text" id="search-input" placeholder="🔍 Search..." data-i18n-placeholder="search">
+  <button class="btn" id="btn-toggle-theme" title="Toggle theme">☀</button>
+  <button class="btn" id="btn-toggle-right" title="Toggle right panel">⊟</button>
+  <span id="lang-toggle" class="btn" title="Switch language">EN/RU</span>
+  <button class="btn" id="btn-github" title="GitHub Sync">⬡ GitHub</button>
+  <button class="btn danger" id="btn-clear-all" title="Clear all data">🗑 <span data-i18n="clearAll">Clear All</span></button>
+</div>
+
+<!-- APP -->
+<div id="app">
+
+  <!-- LEFT SIDEBAR -->
+  <div id="sidebar">
+    <div class="sidebar-tabs">
+      <div class="sidebar-tab active" data-tab="explorer" data-i18n="files">Files</div>
+      <div class="sidebar-tab" data-tab="tags" data-i18n="tags">Tags</div>
+      <div class="sidebar-tab" data-tab="search" data-i18n="search">Search</div>
+    </div>
+
+    <!-- File Explorer -->
+    <div class="sidebar-panel active" id="panel-explorer">
+      <div class="file-explorer-header">
+        <span data-i18n="vault">VAULT</span>
+        <button class="btn" id="btn-new-note2">+</button>
+      </div>
+      <div id="file-explorer"></div>
+    </div>
+
+    <!-- Tags -->
+    <div class="sidebar-panel" id="panel-tags">
+      <div class="file-explorer-header"><span data-i18n="tags">TAGS</span></div>
+      <div id="tags-panel"></div>
+    </div>
+
+    <!-- Search -->
+    <div class="sidebar-panel" id="panel-search">
+      <div id="search-box">
+        <input type="text" id="sidebar-search-input" data-i18n-placeholder="searchNotes">
+      </div>
+      <div id="search-panel"></div>
+    </div>
+  </div>
+
+  <div class="resizer" id="left-resizer"></div>
+
+  <!-- MAIN CONTENT -->
+  <div id="main">
+    <div class="tabs-bar" id="tabs-bar"></div>
+    <div id="editor-area">
+      <!-- Graph view -->
+      <div id="graph-container">
+        <div id="graph-wrap">
+          <canvas id="graph-canvas"></canvas>
+          <div class="graph-controls">
+            <button class="graph-ctrl-btn" id="graph-zoom-in" title="Zoom in">+</button>
+            <button class="graph-ctrl-btn" id="graph-zoom-out" title="Zoom out">−</button>
+            <button class="graph-ctrl-btn" id="graph-fit" title="Fit to screen">⊡</button>
+          </div>
+        </div>
+        <div class="graph-legend">
+          <span><span class="legend-dot" style="background:#569cd6"></span><span data-i18n="note">Note</span></span>
+          <span><span class="legend-dot" style="background:#4ec9b0"></span><span data-i18n="tagNode">Tag</span></span>
+          <span><span class="legend-dot" style="background:#ce9178"></span><span data-i18n="currentNote">Current</span></span>
+          <span style="margin-left:auto;cursor:pointer" id="close-graph">✕ <span data-i18n="closeGraph">Close Graph</span></span>
+        </div>
+      </div>
+      <!-- Notes will be rendered here -->
+      <div id="notes-area" style="height:100%;overflow:hidden;display:flex;flex-direction:column;">
+        <div class="empty-state" id="empty-state">
+          <div style="font-size:48px">🗒</div>
+          <h2 data-i18n="welcome">Welcome to ZK</h2>
+          <p class="hint" data-i18n="welcomeHint">Create a new note to get started. Use [[wikilinks]] to connect ideas.</p>
+          <button class="btn primary" id="btn-new-note3">+ <span data-i18n="newNote">New Note</span></button>
+        </div>
+        <div id="note-editor-wrap" style="display:none;flex-direction:column;height:100%;">
+          <div class="note-title-bar">
+            <input type="text" class="note-title-input" id="note-title-input" placeholder="Note title...">
+            <div class="note-meta">
+              <span id="note-word-count">0 words</span>
+              <span id="note-char-count">0 chars</span>
+              <span id="note-modified">—</span>
+            </div>
+          </div>
+          <div class="editor-toolbar">
+            <button class="toolbar-btn" data-fmt="bold" title="Bold (Ctrl+B)"><b>B</b></button>
+            <button class="toolbar-btn" data-fmt="italic" title="Italic (Ctrl+I)"><i>I</i></button>
+            <button class="toolbar-btn" data-fmt="strike" title="Strikethrough">~~S~~</button>
+            <button class="toolbar-btn" data-fmt="code" title="Inline code">`c`</button>
+            <div class="sep"></div>
+            <button class="toolbar-btn" data-fmt="h1">H1</button>
+            <button class="toolbar-btn" data-fmt="h2">H2</button>
+            <button class="toolbar-btn" data-fmt="h3">H3</button>
+            <div class="sep"></div>
+            <button class="toolbar-btn" data-fmt="ul" title="Bullet list">• List</button>
+            <button class="toolbar-btn" data-fmt="ol" title="Numbered list">1. List</button>
+            <button class="toolbar-btn" data-fmt="task" title="Task list">☐ Task</button>
+            <button class="toolbar-btn" data-fmt="quote" title="Blockquote">"</button>
+            <button class="toolbar-btn" data-fmt="link" title="Insert link">🔗</button>
+            <button class="toolbar-btn" data-fmt="wikilink" title="Insert wikilink">[[]]</button>
+            <div class="sep"></div>
+            <div class="editor-mode-toggle">
+              <button class="mode-btn active" id="mode-edit" data-i18n="edit">Edit</button>
+              <button class="mode-btn" id="mode-preview" data-i18n="preview">Preview</button>
+              <button class="mode-btn" id="mode-split" data-i18n="split">Split</button>
+            </div>
+          </div>
+          <div style="flex:1;overflow:hidden;display:flex;" id="editor-split-area">
+            <textarea id="note-textarea" class="note-editor" spellcheck="true" placeholder="Start writing..."></textarea>
+            <div id="note-preview-pane" class="note-preview" style="display:none;flex:1;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="resizer" id="right-resizer"></div>
+
+  <!-- RIGHT PANEL -->
+  <div id="right-panel">
+    <div class="panel-tabs">
+      <div class="panel-tab active" data-panel="backlinks" data-i18n="backlinks">Backlinks</div>
+      <div class="panel-tab" data-panel="outline" data-i18n="outline">Outline</div>
+      <div class="panel-tab" data-panel="github" data-i18n="github">GitHub</div>
+    </div>
+    <div class="panel-content active" id="pc-backlinks">
+      <div id="backlinks-list"></div>
+    </div>
+    <div class="panel-content" id="pc-outline">
+      <div id="outline-list"></div>
+    </div>
+    <div class="panel-content" id="pc-github">
+      <div id="github-panel">
+        <p style="font-size:12px;color:var(--text2);margin-bottom:8px" data-i18n="githubHint">Connect GitHub to sync notes with your repository (GitHub Pages).</p>
+        <div class="github-form">
+          <label data-i18n="githubToken">Personal Access Token</label>
+          <input type="password" id="gh-token" placeholder="ghp_...">
+          <label data-i18n="githubOwner">Repository Owner</label>
+          <input type="text" id="gh-owner" placeholder="username">
+          <label data-i18n="githubRepo">Repository Name</label>
+          <input type="text" id="gh-repo" placeholder="my-notes">
+          <label data-i18n="githubBranch">Branch</label>
+          <input type="text" id="gh-branch" value="main" placeholder="main">
+          <button class="btn primary" id="btn-gh-connect" data-i18n="connect">Connect</button>
+        </div>
+        <div id="gh-status"></div>
+        <div id="gh-actions" style="display:none;margin-top:8px;display:none;">
+          <button class="btn" id="btn-gh-pull" style="width:100%;margin-bottom:6px" data-i18n="pullFromGH">Pull from GitHub</button>
+          <button class="btn primary" id="btn-gh-push" style="width:100%" data-i18n="pushToGH">Push to GitHub</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- STATUS BAR -->
+<div id="status-bar">
+  <span id="sb-notes-count">0 <span data-i18n="notes">notes</span></span>
+  <span class="sep">|</span>
+  <span id="sb-note-name" data-i18n="noNote">No note open</span>
+  <div class="right">
+    <span id="sb-lang">EN</span>
+    <span id="sb-storage" data-i18n="localStorage">localStorage</span>
+  </div>
+</div>
+
+<!-- MODALS -->
+<!-- New note modal -->
+<div class="modal-overlay" id="modal-new-note">
+  <div class="modal">
+    <h2 data-i18n="createNote">Create New Note</h2>
+    <label data-i18n="noteTitle">Title</label>
+    <input type="text" id="new-note-title" placeholder="My Note">
+    <label data-i18n="noteTemplate">Template (optional)</label>
+    <select id="new-note-template">
+      <option value="">— <span data-i18n="blank">blank</span> —</option>
+      <option value="daily">Daily Note</option>
+      <option value="meeting">Meeting Note</option>
+      <option value="project">Project Note</option>
+    </select>
+    <div class="modal-buttons">
+      <button class="btn" id="btn-cancel-new">Cancel</button>
+      <button class="btn primary" id="btn-confirm-new" data-i18n="create">Create</button>
+    </div>
+  </div>
+</div>
+
+<!-- Quick Switcher -->
+<div class="modal-overlay" id="modal-quick-switcher">
+  <div class="modal" style="min-width:500px">
+    <input type="text" id="quick-switcher-input" data-i18n-placeholder="quickSwitcherPlaceholder">
+    <div id="quick-switcher-results"></div>
+  </div>
+</div>
+
+<!-- Confirm Clear -->
+<div class="modal-overlay" id="modal-confirm-clear">
+  <div class="modal">
+    <h2 data-i18n="confirmClearTitle">Clear All Data?</h2>
+    <p style="color:var(--text2);margin-bottom:16px" data-i18n="confirmClearText">This will delete all notes permanently. This action cannot be undone.</p>
+    <div class="modal-buttons">
+      <button class="btn" id="btn-cancel-clear" data-i18n="cancel">Cancel</button>
+      <button class="btn danger" id="btn-confirm-clear" data-i18n="clearAll">Clear All</button>
+    </div>
+  </div>
+</div>
+
+<!-- Autocomplete dropdown -->
+<div id="autocomplete"></div>
+
+<!-- Graph tooltip -->
+<div id="graph-tooltip"></div>
+
+<!-- Notification -->
+<div id="notification"></div>
+
+<script>
+'use strict';
+
+// ===========================
+// INTERNATIONALIZATION (i18n)
+// ===========================
+const I18N = {
+  en: {
+    newNote: 'New Note', graph: 'Graph', quickOpen: 'Quick Open',
+    search: 'Search...', clearAll: 'Clear All', files: 'Files', tags: 'Tags',
+    vault: 'VAULT', backlinks: 'Backlinks', outline: 'Outline', github: 'GitHub',
+    welcome: 'Welcome to ZK', welcomeHint: 'Create a new note to get started. Use [[wikilinks]] to connect ideas.',
+    notes: 'notes', noNote: 'No note open', localStorage: 'localStorage',
+    edit: 'Edit', preview: 'Preview', split: 'Split',
+    note: 'Note', tagNode: 'Tag', currentNote: 'Current', closeGraph: 'Close Graph',
+    searchNotes: 'Search notes...', connect: 'Connect',
+    githubHint: 'Connect GitHub to sync notes with your repository (GitHub Pages).',
+    githubToken: 'Personal Access Token', githubOwner: 'Repository Owner',
+    githubRepo: 'Repository Name', githubBranch: 'Branch',
+    pullFromGH: 'Pull from GitHub', pushToGH: 'Push to GitHub',
+    createNote: 'Create New Note', noteTitle: 'Title', noteTemplate: 'Template (optional)',
+    blank: 'blank', create: 'Create', cancel: 'Cancel',
+    confirmClearTitle: 'Clear All Data?',
+    confirmClearText: 'This will delete all notes permanently. This action cannot be undone.',
+    quickSwitcherPlaceholder: 'Type note name...',
+    noBacklinks: 'No backlinks found for this note.',
+    noOutline: 'No headings in this note.',
+    connected: 'Connected to GitHub', notConnected: 'Not connected',
+    saved: 'Saved', wordCount: 'words', charCount: 'chars',
+    pushSuccess: 'Pushed to GitHub successfully!', pullSuccess: 'Pulled from GitHub!',
+    pushError: 'Failed to push to GitHub. Check your token and permissions.',
+    pullError: 'Failed to pull from GitHub.',
+    connectError: 'Connection failed. Check token and repository details.',
+    cleared: 'All data cleared.', deleteNote: 'Delete note?',
+    noteDeleted: 'Note deleted.', rename: 'Rename',
+    tagFilter: 'Filter by tag: ',
+  },
+  ru: {
+    newNote: 'Новая заметка', graph: 'Граф', quickOpen: 'Быстрый поиск',
+    search: 'Поиск...', clearAll: 'Очистить всё', files: 'Файлы', tags: 'Теги',
+    vault: 'ХРАНИЛИЩЕ', backlinks: 'Обратные ссылки', outline: 'Структура', github: 'GitHub',
+    welcome: 'Добро пожаловать в ZK', welcomeHint: 'Создайте новую заметку. Используйте [[вики-ссылки]] для связи идей.',
+    notes: 'заметок', noNote: 'Заметка не открыта', localStorage: 'localStorage',
+    edit: 'Редактор', preview: 'Просмотр', split: 'Разделить',
+    note: 'Заметка', tagNode: 'Тег', currentNote: 'Текущая', closeGraph: 'Закрыть граф',
+    searchNotes: 'Поиск заметок...', connect: 'Подключить',
+    githubHint: 'Подключите GitHub для синхронизации заметок с репозиторием (GitHub Pages).',
+    githubToken: 'Персональный токен', githubOwner: 'Владелец репозитория',
+    githubRepo: 'Название репозитория', githubBranch: 'Ветка',
+    pullFromGH: 'Загрузить из GitHub', pushToGH: 'Сохранить в GitHub',
+    createNote: 'Создать заметку', noteTitle: 'Заголовок', noteTemplate: 'Шаблон (опционально)',
+    blank: 'пустой', create: 'Создать', cancel: 'Отмена',
+    confirmClearTitle: 'Очистить все данные?',
+    confirmClearText: 'Все заметки будут удалены безвозвратно. Это действие нельзя отменить.',
+    quickSwitcherPlaceholder: 'Введите название заметки...',
+    noBacklinks: 'Нет обратных ссылок на эту заметку.',
+    noOutline: 'Нет заголовков в заметке.',
+    connected: 'Подключено к GitHub', notConnected: 'Не подключено',
+    saved: 'Сохранено', wordCount: 'слов', charCount: 'символов',
+    pushSuccess: 'Успешно сохранено в GitHub!', pullSuccess: 'Загружено из GitHub!',
+    pushError: 'Ошибка сохранения в GitHub. Проверьте токен и права доступа.',
+    pullError: 'Ошибка загрузки из GitHub.',
+    connectError: 'Ошибка подключения. Проверьте токен и данные репозитория.',
+    cleared: 'Все данные очищены.', deleteNote: 'Удалить заметку?',
+    noteDeleted: 'Заметка удалена.', rename: 'Переименовать',
+    tagFilter: 'Фильтр по тегу: ',
+  }
+};
+
+let currentLang = localStorage.getItem('zk-lang') || 'en';
+
+function t(key) {
+  return (I18N[currentLang] && I18N[currentLang][key]) || I18N.en[key] || key;
+}
+
+function applyI18n() {
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.getAttribute('data-i18n');
+    el.textContent = t(key);
+  });
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+    el.placeholder = t(el.getAttribute('data-i18n-placeholder'));
+  });
+  document.documentElement.lang = currentLang;
+  document.getElementById('sb-lang').textContent = currentLang.toUpperCase();
+}
+
+// ===========================
+// STORAGE / DATA MODEL
+// ===========================
+const STORAGE_KEY = 'zk-notes';
+
+function loadNotes() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch { return {}; }
+}
+
+function saveNotes(notes) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(notes));
+}
+
+let notes = loadNotes(); // { id: { id, title, content, created, modified, folder } }
+
+function genId() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+}
+
+function createNote(title, content = '', folder = '') {
+  const id = genId();
+  const now = new Date().toISOString();
+  notes[id] = { id, title: title || t('newNote'), content, created: now, modified: now, folder };
+  saveNotes(notes);
+  return notes[id];
+}
+
+function updateNote(id, patch) {
+  if (!notes[id]) return;
+  Object.assign(notes[id], patch, { modified: new Date().toISOString() });
+  saveNotes(notes);
+}
+
+function deleteNote(id) {
+  delete notes[id];
+  saveNotes(notes);
+}
+
+// ===========================
+// MARKDOWN PARSER (custom lightweight)
+// ===========================
+function parseMarkdown(md, noteId) {
+  if (!md) return '';
+  let html = md;
+
+  // Code blocks (fenced)
+  html = html.replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) =>
+    `<pre><code class="lang-${lang}">${escHtml(code.trimEnd())}</code></pre>`);
+
+  // Inline code
+  html = html.replace(/`([^`\n]+)`/g, (_, c) => `<code>${escHtml(c)}</code>`);
+
+  // Headings
+  html = html.replace(/^(#{1,6})\s+(.+)$/gm, (_, h, txt) => {
+    const lvl = h.length;
+    const id = 'h-' + txt.trim().toLowerCase().replace(/[^\w]+/g, '-');
+    return `<h${lvl} id="${id}">${txt}</h${lvl}>`;
+  });
+
+  // Horizontal rule
+  html = html.replace(/^[-*_]{3,}\s*$/gm, '<hr>');
+
+  // Blockquotes
+  html = html.replace(/^>\s*(.+)$/gm, (_, t) => `<blockquote>${t}</blockquote>`);
+
+  // Tables
+  html = html.replace(/\|(.+)\|\n\|[-| :]+\|\n((?:\|.+\|\n?)+)/g, (_, header, rows) => {
+    const ths = header.split('|').filter(Boolean).map(h => `<th>${h.trim()}</th>`).join('');
+    const trs = rows.trim().split('\n').map(row => {
+      const tds = row.split('|').filter(Boolean).map(c => `<td>${c.trim()}</td>`).join('');
+      return `<tr>${tds}</tr>`;
+    }).join('');
+    return `<table><thead><tr>${ths}</tr></thead><tbody>${trs}</tbody></table>`;
+  });
+
+  // Task lists
+  html = html.replace(/^[-*] \[( |x)\] (.+)$/gm, (_, check, text) => {
+    const checked = check === 'x' ? ' checked' : '';
+    return `<li class="task-item"><input type="checkbox"${checked} disabled>${inlineFormat(text)}</li>`;
+  });
+
+  // Unordered lists
+  html = html.replace(/^[-*+]\s+(.+)$/gm, (_, t) => `<li>${inlineFormat(t)}</li>`);
+  html = html.replace(/(<li>.*<\/li>\n?)+/g, match => `<ul>${match}</ul>`);
+
+  // Ordered lists
+  html = html.replace(/^\d+\.\s+(.+)$/gm, (_, t) => `<li>${inlineFormat(t)}</li>`);
+
+  // Paragraphs (wrap lone lines not already wrapped)
+  html = html.split(/\n\n+/).map(block => {
+    if (/^<(h[1-6]|ul|ol|pre|blockquote|table|hr|li)/.test(block.trim())) return block;
+    if (!block.trim()) return '';
+    return `<p>${inlineFormat(block.trim())}</p>`;
+  }).join('\n');
+
+  return html;
+}
+
+function inlineFormat(text) {
+  if (!text) return '';
+
+  // Bold+italic
+  text = text.replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>');
+  // Bold
+  text = text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  text = text.replace(/__(.+?)__/g, '<strong>$1</strong>');
+  // Italic
+  text = text.replace(/\*(.+?)\*/g, '<em>$1</em>');
+  text = text.replace(/_(.+?)_/g, '<em>$1</em>');
+  // Strikethrough
+  text = text.replace(/~~(.+?)~~/g, '<del>$1</del>');
+
+  // Wiki links [[note|alias]] or [[note]]
+  text = text.replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (_, target, alias) => {
+    const display = alias || target;
+    const exists = Object.values(notes).some(n => n.title.toLowerCase() === target.toLowerCase());
+    const cls = exists ? 'wiki-link' : 'wiki-link broken';
+    return `<a class="${cls}" href="#" data-wiki="${escAttr(target)}">${escHtml(display)}</a>`;
+  });
+
+  // Standard markdown links
+  text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+
+  // Images
+  text = text.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1">');
+
+  // Tags
+  text = text.replace(/(^|\s)(#[a-zA-Zа-яёА-ЯЁ][a-zA-Zа-яёА-ЯЁ0-9/_-]*)/g, (_, pre, tag) =>
+    `${pre}<span class="tag" data-tag="${escAttr(tag)}">${tag}</span>`);
+
+  return text;
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+function escAttr(s) {
+  return String(s).replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+// ===========================
+// EXTRACT LINKS / TAGS
+// ===========================
+function extractWikiLinks(content) {
+  const links = new Set();
+  const regex = /\[\[([^\]|#]+)(?:\|[^\]]*)?\]\]/g;
+  let m;
+  while ((m = regex.exec(content)) !== null) links.add(m[1].trim());
+  return links;
+}
+
+function extractTags(content) {
+  const tags = new Set();
+  const regex = /(^|\s)(#[a-zA-Zа-яёА-ЯЁ][a-zA-Zа-яёА-ЯЁ0-9/_-]*)/g;
+  let m;
+  while ((m = regex.exec(content)) !== null) tags.add(m[2]);
+  return tags;
+}
+
+// Build backlinks map: { noteTitle -> [linking note ids] }
+function buildBacklinksMap() {
+  const map = {}; // title (lower) -> Set of note IDs
+  Object.values(notes).forEach(note => {
+    extractWikiLinks(note.content).forEach(link => {
+      const key = link.toLowerCase();
+      if (!map[key]) map[key] = new Set();
+      map[key].add(note.id);
+    });
+  });
+  return map;
+}
+
+// Build all tags map: { tag -> [note ids] }
+function buildTagsMap() {
+  const map = {};
+  Object.values(notes).forEach(note => {
+    extractTags(note.content + ' ' + note.title).forEach(tag => {
+      if (!map[tag]) map[tag] = [];
+      map[tag].push(note.id);
+    });
+  });
+  return map;
+}
+
+// ===========================
+// APP STATE
+// ===========================
+let openTabs = []; // array of note ids
+let activeTab = null;
+let editorMode = 'edit'; // 'edit' | 'preview' | 'split'
+let graphOpen = false;
+let tagFilter = null;
+let ghConfig = null;
+
+try {
+  ghConfig = JSON.parse(localStorage.getItem('zk-gh-config') || 'null');
+} catch {}
+
+// ===========================
+// UI ELEMENTS
+// ===========================
+const fileExplorer = document.getElementById('file-explorer');
+const tagsPanel = document.getElementById('tags-panel');
+const searchPanel = document.getElementById('search-panel');
+const tabsBar = document.getElementById('tabs-bar');
+const noteEditorWrap = document.getElementById('note-editor-wrap');
+const emptyState = document.getElementById('empty-state');
+const noteTitleInput = document.getElementById('note-title-input');
+const noteTextarea = document.getElementById('note-textarea');
+const notePreviewPane = document.getElementById('note-preview-pane');
+const backLinksList = document.getElementById('backlinks-list');
+const outlineList = document.getElementById('outline-list');
+const sbNotesCount = document.getElementById('sb-notes-count');
+const sbNoteName = document.getElementById('sb-note-name');
+const notifEl = document.getElementById('notification');
+const graphCanvas = document.getElementById('graph-canvas');
+const graphContainer = document.getElementById('graph-container');
+const notesArea = document.getElementById('notes-area');
+
+// ===========================
+// NOTIFICATIONS
+// ===========================
+let notifTimer;
+function notify(msg, duration = 2500) {
+  notifEl.textContent = msg;
+  notifEl.classList.add('show');
+  clearTimeout(notifTimer);
+  notifTimer = setTimeout(() => notifEl.classList.remove('show'), duration);
+}
+
+// ===========================
+// FILE EXPLORER
+// ===========================
+function renderFileExplorer() {
+  const noteList = Object.values(notes).sort((a, b) => a.title.localeCompare(b.title, currentLang));
+  const filtered = tagFilter
+    ? noteList.filter(n => extractTags(n.content + ' ' + n.title).has(tagFilter))
+    : noteList;
+
+  fileExplorer.innerHTML = '';
+  if (tagFilter) {
+    const badge = document.createElement('div');
+    badge.style.cssText = 'padding:4px 8px;font-size:11px;color:var(--tag);cursor:pointer;';
+    badge.textContent = t('tagFilter') + tagFilter + ' ✕';
+    badge.onclick = () => { tagFilter = null; renderFileExplorer(); };
+    fileExplorer.appendChild(badge);
+  }
+
+  // Group by folder
+  const folders = {};
+  filtered.forEach(note => {
+    const f = note.folder || '';
+    if (!folders[f]) folders[f] = [];
+    folders[f].push(note);
+  });
+
+  // Sort folders
+  const folderKeys = Object.keys(folders).sort();
+  folderKeys.forEach(folder => {
+    if (folder) {
+      const fDiv = document.createElement('div');
+      fDiv.className = 'folder-item';
+      fDiv.innerHTML = `<span class="icon">📁</span><span class="name">${escHtml(folder)}</span>`;
+      fileExplorer.appendChild(fDiv);
+      const childDiv = document.createElement('div');
+      childDiv.className = 'folder-children';
+      folders[folder].forEach(note => childDiv.appendChild(makeFileItem(note)));
+      fileExplorer.appendChild(childDiv);
+    } else {
+      folders[folder].forEach(note => fileExplorer.appendChild(makeFileItem(note)));
+    }
+  });
+
+  sbNotesCount.innerHTML = `${Object.keys(notes).length} <span data-i18n="notes">${t('notes')}</span>`;
+}
+
+function makeFileItem(note) {
+  const div = document.createElement('div');
+  div.className = 'file-item' + (note.id === activeTab ? ' active' : '');
+  div.dataset.id = note.id;
+  div.innerHTML = `<span class="icon">📝</span><span class="name">${escHtml(note.title)}</span><button class="file-ctx-btn" data-id="${note.id}" title="Delete">✕</button>`;
+  div.addEventListener('click', e => {
+    if (e.target.classList.contains('file-ctx-btn')) {
+      if (confirm(t('deleteNote') + ' "' + note.title + '"?')) {
+        closeTab(note.id);
+        deleteNote(note.id);
+        renderAll();
+        notify(t('noteDeleted'));
+      }
+      return;
+    }
+    openNote(note.id);
+  });
+  return div;
+}
+
+// ===========================
+// TAGS PANEL
+// ===========================
+function renderTagsPanel() {
+  const map = buildTagsMap();
+  tagsPanel.innerHTML = '';
+  Object.entries(map).sort((a,b) => b[1].length - a[1].length).forEach(([tag, ids]) => {
+    const div = document.createElement('div');
+    div.className = 'tag-item';
+    div.innerHTML = `<span class="tag-name">${escHtml(tag)}</span><span class="tag-count">${ids.length}</span>`;
+    div.onclick = () => {
+      tagFilter = tag;
+      renderFileExplorer();
+      // Switch to files tab
+      document.querySelector('.sidebar-tab[data-tab="explorer"]').click();
+    };
+    tagsPanel.appendChild(div);
+  });
+  if (!Object.keys(map).length) {
+    tagsPanel.innerHTML = `<p style="padding:12px;color:var(--text2);font-size:13px">#tags appear here</p>`;
+  }
+}
+
+// ===========================
+// TABS
+// ===========================
+function renderTabs() {
+  tabsBar.innerHTML = '';
+  openTabs.forEach(id => {
+    const note = notes[id];
+    if (!note) return;
+    const tab = document.createElement('div');
+    tab.className = 'tab' + (id === activeTab ? ' active' : '');
+    tab.dataset.id = id;
+    tab.innerHTML = `<span>${escHtml(note.title)}</span><button class="tab-close" data-id="${id}">✕</button>`;
+    tab.addEventListener('click', e => {
+      if (e.target.classList.contains('tab-close')) {
+        closeTab(e.target.dataset.id);
+        return;
+      }
+      activateTab(id);
+    });
+    tabsBar.appendChild(tab);
+  });
+}
+
+function openNote(id) {
+  if (!notes[id]) return;
+  if (!openTabs.includes(id)) openTabs.push(id);
+  activateTab(id);
+}
+
+function activateTab(id) {
+  activeTab = id;
+  renderTabs();
+  renderFileExplorer();
+  showEditor(id);
+  if (graphOpen) drawGraph();
+}
+
+function closeTab(id) {
+  openTabs = openTabs.filter(t => t !== id);
+  if (activeTab === id) {
+    activeTab = openTabs[openTabs.length - 1] || null;
+  }
+  renderTabs();
+  if (activeTab) {
+    showEditor(activeTab);
+    renderFileExplorer();
+  } else {
+    showEmptyState();
+  }
+}
+
+// ===========================
+// EDITOR
+// ===========================
+function showEmptyState() {
+  emptyState.style.display = '';
+  noteEditorWrap.style.display = 'none';
+  graphContainer.classList.remove('active');
+  sbNoteName.textContent = t('noNote');
+  backLinksList.innerHTML = '';
+  outlineList.innerHTML = '';
+}
+
+function showEditor(id) {
+  const note = notes[id];
+  if (!note) { showEmptyState(); return; }
+
+  graphContainer.classList.remove('active');
+  notesArea.style.display = '';
+  emptyState.style.display = 'none';
+  noteEditorWrap.style.display = 'flex';
+
+  noteTitleInput.value = note.title;
+  noteTextarea.value = note.content;
+  sbNoteName.textContent = note.title;
+  updateMeta();
+  applyEditorMode();
+  updatePreview();
+  renderBacklinks(id);
+  renderOutline(note.content);
+}
+
+function applyEditorMode() {
+  const ta = noteTextarea;
+  const pv = notePreviewPane;
+  document.getElementById('mode-edit').classList.toggle('active', editorMode === 'edit');
+  document.getElementById('mode-preview').classList.toggle('active', editorMode === 'preview');
+  document.getElementById('mode-split').classList.toggle('active', editorMode === 'split');
+
+  if (editorMode === 'edit') {
+    ta.style.display = ''; pv.style.display = 'none';
+    ta.style.flex = '1';
+  } else if (editorMode === 'preview') {
+    ta.style.display = 'none'; pv.style.display = '';
+    pv.style.flex = '1';
+  } else { // split
+    ta.style.display = ''; pv.style.display = '';
+    ta.style.flex = '1'; pv.style.flex = '1';
+  }
+}
+
+function updatePreview() {
+  if (editorMode === 'edit') return;
+  notePreviewPane.innerHTML = parseMarkdown(noteTextarea.value, activeTab);
+  // Attach wiki-link click handlers
+  notePreviewPane.querySelectorAll('a.wiki-link').forEach(a => {
+    a.onclick = e => {
+      e.preventDefault();
+      const target = a.dataset.wiki;
+      const found = Object.values(notes).find(n => n.title.toLowerCase() === target.toLowerCase());
+      if (found) openNote(found.id);
+      else {
+        // Create note on click
+        const nn = createNote(target);
+        renderAll();
+        openNote(nn.id);
+      }
+    };
+  });
+  notePreviewPane.querySelectorAll('.tag').forEach(el => {
+    el.onclick = () => {
+      tagFilter = el.dataset.tag;
+      renderFileExplorer();
+      document.querySelector('.sidebar-tab[data-tab="explorer"]').click();
+    };
+  });
+}
+
+function updateMeta() {
+  if (!activeTab) return;
+  const content = noteTextarea.value;
+  const words = content.trim() ? content.trim().split(/\s+/).length : 0;
+  const chars = content.length;
+  document.getElementById('note-word-count').textContent = `${words} ${t('wordCount')}`;
+  document.getElementById('note-char-count').textContent = `${chars} ${t('charCount')}`;
+  const note = notes[activeTab];
+  if (note) {
+    const d = new Date(note.modified);
+    document.getElementById('note-modified').textContent = d.toLocaleString(currentLang === 'ru' ? 'ru-RU' : 'en-US');
+  }
+}
+
+// ===========================
+// BACKLINKS
+// ===========================
+function renderBacklinks(id) {
+  const note = notes[id];
+  if (!note) { backLinksList.innerHTML = ''; return; }
+  const backlinks = buildBacklinksMap();
+  const key = note.title.toLowerCase();
+  const sources = backlinks[key] ? [...backlinks[key]] : [];
+
+  backLinksList.innerHTML = '';
+  if (!sources.length) {
+    backLinksList.innerHTML = `<p class="no-backlinks">${t('noBacklinks')}</p>`;
+    return;
+  }
+  sources.forEach(srcId => {
+    const src = notes[srcId];
+    if (!src) return;
+    const ctx = getContext(src.content, note.title);
+    const item = document.createElement('div');
+    item.className = 'backlink-item';
+    item.innerHTML = `<div class="bl-title">${escHtml(src.title)}</div><div class="bl-ctx">${ctx}</div>`;
+    item.onclick = () => openNote(srcId);
+    backLinksList.appendChild(item);
+  });
+}
+
+function getContext(content, keyword) {
+  const idx = content.toLowerCase().indexOf(keyword.toLowerCase());
+  if (idx < 0) return '';
+  const start = Math.max(0, idx - 40);
+  const end = Math.min(content.length, idx + keyword.length + 40);
+  let ctx = (start > 0 ? '…' : '') + content.slice(start, end) + (end < content.length ? '…' : '');
+  ctx = escHtml(ctx);
+  const re = new RegExp(escHtml(keyword), 'gi');
+  ctx = ctx.replace(re, m => `<mark>${m}</mark>`);
+  return ctx;
+}
+
+// ===========================
+// OUTLINE
+// ===========================
+function renderOutline(content) {
+  outlineList.innerHTML = '';
+  const headings = [...(content || '').matchAll(/^(#{1,4})\s+(.+)$/gm)];
+  if (!headings.length) {
+    outlineList.innerHTML = `<p style="padding:12px;color:var(--text2);font-size:13px">${t('noOutline')}</p>`;
+    return;
+  }
+  headings.forEach(([_, h, txt]) => {
+    const div = document.createElement('div');
+    div.className = `outline-item outline-h${h.length}`;
+    div.textContent = txt;
+    div.onclick = () => {
+      if (editorMode === 'preview' || editorMode === 'split') {
+        const id = 'h-' + txt.trim().toLowerCase().replace(/[^\w]+/g, '-');
+        const el = notePreviewPane.querySelector('#' + id);
+        if (el) el.scrollIntoView({ behavior: 'smooth' });
+      } else {
+        const ta = noteTextarea;
+        const idx = ta.value.indexOf(txt);
+        if (idx >= 0) {
+          ta.focus();
+          ta.setSelectionRange(idx, idx + txt.length);
+          // Scroll to position
+          const lineHeight = parseInt(getComputedStyle(ta).lineHeight) || 20;
+          const lines = ta.value.substr(0, idx).split('\n').length;
+          ta.scrollTop = (lines - 1) * lineHeight;
+        }
+      }
+    };
+    outlineList.appendChild(div);
+  });
+}
+
+// ===========================
+// GRAPH VIEW
+// ===========================
+let graphNodes = [], graphEdges = [];
+let graphTransform = { x: 0, y: 0, scale: 1 };
+let graphDragging = null;
+let graphPanning = false;
+let graphPanStart = null;
+let graphSimRunning = false;
+let graphAnimFrame = null;
+
+function openGraph() {
+  graphOpen = true;
+  graphContainer.classList.add('active');
+  notesArea.style.display = 'none';
+  buildGraphData();
+  resizeGraph();
+  startGraphSim();
+}
+
+function closeGraph() {
+  graphOpen = false;
+  graphContainer.classList.remove('active');
+  notesArea.style.display = '';
+  cancelAnimationFrame(graphAnimFrame);
+  if (activeTab) showEditor(activeTab);
+  else showEmptyState();
+}
+
+function buildGraphData() {
+  graphNodes = [];
+  graphEdges = [];
+
+  const noteList = Object.values(notes);
+  const W = graphCanvas.width / 2;
+  const H = graphCanvas.height / 2;
+
+  // Add note nodes
+  noteList.forEach(note => {
+    graphNodes.push({
+      id: 'n:' + note.id,
+      label: note.title,
+      type: 'note',
+      noteId: note.id,
+      x: W + (Math.random() - 0.5) * W,
+      y: H + (Math.random() - 0.5) * H,
+      vx: 0, vy: 0,
+      links: 0
+    });
+  });
+
+  // Add tag nodes and edges
+  const tagMap = buildTagsMap();
+  const tagNodesMap = {};
+  Object.entries(tagMap).forEach(([tag, ids]) => {
+    const tid = 'tag:' + tag;
+    tagNodesMap[tag] = tid;
+    graphNodes.push({
+      id: tid, label: tag, type: 'tag',
+      x: W + (Math.random() - 0.5) * W,
+      y: H + (Math.random() - 0.5) * H,
+      vx: 0, vy: 0, links: ids.length
+    });
+    ids.forEach(nid => {
+      graphEdges.push({ source: 'n:' + nid, target: tid });
+    });
+  });
+
+  // Add wiki-link edges
+  noteList.forEach(note => {
+    extractWikiLinks(note.content).forEach(link => {
+      const target = noteList.find(n => n.title.toLowerCase() === link.toLowerCase());
+      if (target) {
+        const s = 'n:' + note.id, t = 'n:' + target.id;
+        if (!graphEdges.some(e => (e.source === s && e.target === t) || (e.source === t && e.target === s))) {
+          graphEdges.push({ source: s, target: t });
+        }
+      }
+    });
+  });
+
+  // Count links for node sizing
+  const nodeById = {};
+  graphNodes.forEach(n => { nodeById[n.id] = n; });
+  graphEdges.forEach(e => {
+    if (nodeById[e.source]) nodeById[e.source].links++;
+    if (nodeById[e.target]) nodeById[e.target].links++;
+  });
+}
+
+function resizeGraph() {
+  const wrap = document.getElementById('graph-wrap');
+  graphCanvas.width = wrap.clientWidth;
+  graphCanvas.height = wrap.clientHeight;
+}
+
+function startGraphSim() {
+  graphSimRunning = true;
+  let tick = 0;
+  function step() {
+    if (!graphSimRunning) return;
+    simulateForces();
+    drawGraph();
+    tick++;
+    if (tick < 200) graphAnimFrame = requestAnimationFrame(step);
+    else { graphSimRunning = false; drawGraph(); }
+  }
+  graphAnimFrame = requestAnimationFrame(step);
+}
+
+function simulateForces() {
+  const nodeById = {};
+  graphNodes.forEach(n => { nodeById[n.id] = n; });
+
+  const W = graphCanvas.width, H = graphCanvas.height;
+  const alpha = 0.3;
+  const repulse = 3000, attract = 0.05, centering = 0.01;
+
+  // Repulsion between nodes
+  for (let i = 0; i < graphNodes.length; i++) {
+    for (let j = i + 1; j < graphNodes.length; j++) {
+      const a = graphNodes[i], b = graphNodes[j];
+      const dx = b.x - a.x, dy = b.y - a.y;
+      const dist = Math.sqrt(dx*dx + dy*dy) || 1;
+      const force = repulse / (dist * dist);
+      const fx = (dx / dist) * force, fy = (dy / dist) * force;
+      a.vx -= fx; a.vy -= fy;
+      b.vx += fx; b.vy += fy;
+    }
+  }
+
+  // Attraction along edges
+  graphEdges.forEach(e => {
+    const a = nodeById[e.source], b = nodeById[e.target];
+    if (!a || !b) return;
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const dist = Math.sqrt(dx*dx + dy*dy) || 1;
+    const idealLen = 120;
+    const force = (dist - idealLen) * attract;
+    const fx = (dx / dist) * force, fy = (dy / dist) * force;
+    a.vx += fx; a.vy += fy;
+    b.vx -= fx; b.vy -= fy;
+  });
+
+  // Center gravity
+  graphNodes.forEach(n => {
+    n.vx += (W / 2 - n.x) * centering;
+    n.vy += (H / 2 - n.y) * centering;
+    n.x += n.vx * alpha; n.y += n.vy * alpha;
+    n.vx *= 0.9; n.vy *= 0.9;
+  });
+}
+
+function drawGraph() {
+  if (!graphCanvas.width || !graphCanvas.height) return;
+  const ctx = graphCanvas.getContext('2d');
+  ctx.clearRect(0, 0, graphCanvas.width, graphCanvas.height);
+  ctx.save();
+  ctx.translate(graphTransform.x, graphTransform.y);
+  ctx.scale(graphTransform.scale, graphTransform.scale);
+
+  const nodeById = {};
+  graphNodes.forEach(n => { nodeById[n.id] = n; });
+
+  const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
+  const edgeColor = isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.15)';
+  const labelColor = isDark ? '#d4d4d4' : '#333';
+
+  // Draw edges
+  ctx.strokeStyle = edgeColor;
+  ctx.lineWidth = 1;
+  graphEdges.forEach(e => {
+    const a = nodeById[e.source], b = nodeById[e.target];
+    if (!a || !b) return;
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, b.y);
+    ctx.stroke();
+  });
+
+  // Draw nodes
+  graphNodes.forEach(n => {
+    const isActive = n.noteId && n.noteId === activeTab;
+    const r = Math.min(20, 5 + n.links * 2);
+    let color;
+    if (isActive) color = '#ce9178';
+    else if (n.type === 'tag') color = '#4ec9b0';
+    else color = '#569cd6';
+
+    ctx.beginPath();
+    ctx.arc(n.x, n.y, r, 0, Math.PI * 2);
+    ctx.fillStyle = color;
+    ctx.fill();
+    if (isActive) {
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+
+    // Label
+    ctx.font = `${Math.min(12, 8 + n.links)}px -apple-system, sans-serif`;
+    ctx.fillStyle = labelColor;
+    ctx.textAlign = 'center';
+    ctx.fillText(n.label.length > 20 ? n.label.slice(0, 18) + '…' : n.label, n.x, n.y + r + 12);
+  });
+
+  ctx.restore();
+}
+
+// Graph interactions
+graphCanvas.addEventListener('mousedown', e => {
+  const pos = canvasPos(e);
+  const node = findNodeAt(pos.x, pos.y);
+  if (node) {
+    graphDragging = node;
+  } else {
+    graphPanning = true;
+    graphPanStart = { x: e.clientX - graphTransform.x, y: e.clientY - graphTransform.y };
+  }
+});
+
+graphCanvas.addEventListener('mousemove', e => {
+  if (graphDragging) {
+    const pos = canvasPos(e);
+    graphDragging.x = pos.x; graphDragging.y = pos.y;
+    graphDragging.vx = 0; graphDragging.vy = 0;
+    drawGraph();
+  } else if (graphPanning) {
+    graphTransform.x = e.clientX - graphPanStart.x;
+    graphTransform.y = e.clientY - graphPanStart.y;
+    drawGraph();
+  } else {
+    // Tooltip
+    const pos = canvasPos(e);
+    const node = findNodeAt(pos.x, pos.y);
+    const tip = document.getElementById('graph-tooltip');
+    if (node) {
+      tip.style.display = 'block';
+      tip.style.left = (e.clientX + 12) + 'px';
+      tip.style.top = (e.clientY - 20) + 'px';
+      tip.textContent = node.label + (node.links ? ` (${node.links} links)` : '');
+    } else {
+      tip.style.display = 'none';
+    }
+  }
+});
+
+graphCanvas.addEventListener('mouseup', e => {
+  if (graphDragging) {
+    const pos = canvasPos(e);
+    const dist = Math.hypot(pos.x - graphDragging.x, pos.y - graphDragging.y);
+    if (dist < 5 && graphDragging.noteId) {
+      openNote(graphDragging.noteId);
+    }
+    graphDragging = null;
+  }
+  graphPanning = false;
+});
+graphCanvas.addEventListener('mouseleave', () => {
+  graphDragging = null; graphPanning = false;
+  document.getElementById('graph-tooltip').style.display = 'none';
+});
+
+graphCanvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  const factor = e.deltaY > 0 ? 0.9 : 1.1;
+  const pos = canvasPos(e);
+  graphTransform.x = pos.x * (1 - factor) + graphTransform.x * factor;
+  graphTransform.y = pos.y * (1 - factor) + graphTransform.y * factor;
+  graphTransform.scale *= factor;
+  drawGraph();
+}, { passive: false });
+
+function canvasPos(e) {
+  const rect = graphCanvas.getBoundingClientRect();
+  return {
+    x: (e.clientX - rect.left - graphTransform.x) / graphTransform.scale,
+    y: (e.clientY - rect.top - graphTransform.y) / graphTransform.scale
+  };
+}
+
+function findNodeAt(x, y) {
+  for (let i = graphNodes.length - 1; i >= 0; i--) {
+    const n = graphNodes[i];
+    const r = Math.min(20, 5 + n.links * 2);
+    if (Math.hypot(x - n.x, y - n.y) <= r + 3) return n;
+  }
+  return null;
+}
+
+document.getElementById('graph-zoom-in').onclick = () => {
+  graphTransform.scale *= 1.2;
+  drawGraph();
+};
+document.getElementById('graph-zoom-out').onclick = () => {
+  graphTransform.scale *= 0.8;
+  drawGraph();
+};
+document.getElementById('graph-fit').onclick = () => {
+  graphTransform = { x: 0, y: 0, scale: 1 };
+  drawGraph();
+};
+document.getElementById('close-graph').onclick = closeGraph;
+
+// ===========================
+// SEARCH
+// ===========================
+function runSearch(query) {
+  searchPanel.innerHTML = '';
+  if (!query.trim()) return;
+
+  const q = query.toLowerCase().trim();
+  const results = [];
+
+  Object.values(notes).forEach(note => {
+    let score = 0;
+    let preview = '';
+    const titleLow = note.title.toLowerCase();
+    const contentLow = note.content.toLowerCase();
+
+    if (titleLow.includes(q)) score += 10;
+    const idx = contentLow.indexOf(q);
+    if (idx >= 0) {
+      score += 5;
+      const start = Math.max(0, idx - 40);
+      const end = Math.min(note.content.length, idx + q.length + 60);
+      preview = (start > 0 ? '…' : '') + note.content.slice(start, end);
+    }
+    if (score > 0) results.push({ note, score, preview });
+  });
+
+  results.sort((a, b) => b.score - a.score);
+  results.forEach(({ note, preview }) => {
+    const div = document.createElement('div');
+    div.className = 'search-result';
+    const esc = escHtml(preview || note.content.slice(0, 100));
+    const re = new RegExp(escHtml(query.trim()), 'gi');
+    const highlighted = esc.replace(re, m => `<mark>${m}</mark>`);
+    div.innerHTML = `<div class="result-title">${escHtml(note.title)}</div><div class="result-preview">${highlighted}</div>`;
+    div.onclick = () => openNote(note.id);
+    searchPanel.appendChild(div);
+  });
+  if (!results.length) {
+    searchPanel.innerHTML = `<p style="padding:12px;color:var(--text2);font-size:13px">No results</p>`;
+  }
+}
+
+// Header search
+document.getElementById('search-input').addEventListener('input', e => {
+  if (e.target.value.trim()) {
+    document.querySelector('.sidebar-tab[data-tab="search"]').click();
+    document.getElementById('sidebar-search-input').value = e.target.value;
+    runSearch(e.target.value);
+  }
+});
+document.getElementById('sidebar-search-input').addEventListener('input', e => {
+  runSearch(e.target.value);
+});
+
+// ===========================
+// QUICK SWITCHER
+// ===========================
+function openQuickSwitcher() {
+  document.getElementById('modal-quick-switcher').classList.add('active');
+  const input = document.getElementById('quick-switcher-input');
+  input.value = '';
+  input.focus();
+  renderQSResults('');
+}
+
+let qsSelected = 0;
+document.getElementById('quick-switcher-input').addEventListener('input', e => {
+  qsSelected = 0;
+  renderQSResults(e.target.value);
+});
+document.getElementById('quick-switcher-input').addEventListener('keydown', e => {
+  const items = document.querySelectorAll('.qs-item');
+  if (e.key === 'ArrowDown') { qsSelected = Math.min(qsSelected + 1, items.length - 1); highlightQS(items); e.preventDefault(); }
+  else if (e.key === 'ArrowUp') { qsSelected = Math.max(qsSelected - 1, 0); highlightQS(items); e.preventDefault(); }
+  else if (e.key === 'Enter') { items[qsSelected]?.click(); }
+  else if (e.key === 'Escape') { document.getElementById('modal-quick-switcher').classList.remove('active'); }
+});
+
+function highlightQS(items) {
+  items.forEach((el, i) => el.classList.toggle('selected', i === qsSelected));
+}
+
+function renderQSResults(q) {
+  const container = document.getElementById('quick-switcher-results');
+  container.innerHTML = '';
+  const sorted = Object.values(notes)
+    .filter(n => !q || n.title.toLowerCase().includes(q.toLowerCase()))
+    .sort((a, b) => a.title.localeCompare(b.title));
+  sorted.slice(0, 20).forEach((note, i) => {
+    const div = document.createElement('div');
+    div.className = 'qs-item' + (i === qsSelected ? ' selected' : '');
+    div.textContent = note.title;
+    div.onclick = () => {
+      document.getElementById('modal-quick-switcher').classList.remove('active');
+      openNote(note.id);
+    };
+    container.appendChild(div);
+  });
+}
+
+// Click outside to close
+document.getElementById('modal-quick-switcher').addEventListener('click', e => {
+  if (e.target === document.getElementById('modal-quick-switcher'))
+    document.getElementById('modal-quick-switcher').classList.remove('active');
+});
+
+// ===========================
+// AUTOCOMPLETE (wiki links)
+// ===========================
+const acEl = document.getElementById('autocomplete');
+let acState = null; // { start, prefix }
+
+noteTextarea.addEventListener('keyup', handleAutocomplete);
+noteTextarea.addEventListener('click', () => hideAC());
+
+function handleAutocomplete(e) {
+  if (['ArrowLeft','ArrowRight','Escape','Enter'].includes(e.key)) return;
+  const pos = noteTextarea.selectionStart;
+  const before = noteTextarea.value.substring(0, pos);
+  const m = before.match(/\[\[([^\]]*?)$/);
+  if (m) {
+    const prefix = m[1];
+    acState = { start: pos - prefix.length, prefix };
+    showAC(prefix);
+  } else {
+    hideAC();
+  }
+}
+
+noteTextarea.addEventListener('keydown', e => {
+  if (!acEl.style.display || acEl.style.display === 'none') return;
+  const items = acEl.querySelectorAll('.ac-item');
+  const sel = acEl.querySelector('.ac-item.selected');
+  const idx = sel ? [...items].indexOf(sel) : -1;
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    const next = items[Math.min(idx + 1, items.length - 1)];
+    items.forEach(i => i.classList.remove('selected'));
+    next?.classList.add('selected');
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    const prev = items[Math.max(idx - 1, 0)];
+    items.forEach(i => i.classList.remove('selected'));
+    prev?.classList.add('selected');
+  } else if (e.key === 'Enter' && sel) {
+    e.preventDefault();
+    insertAC(sel.dataset.title);
+  } else if (e.key === 'Escape') {
+    hideAC();
+  }
+});
+
+function showAC(prefix) {
+  const matches = Object.values(notes)
+    .filter(n => n.title.toLowerCase().startsWith(prefix.toLowerCase()))
+    .slice(0, 8);
+  if (!matches.length) { hideAC(); return; }
+
+  const rect = noteTextarea.getBoundingClientRect();
+  // Approximate cursor position
+  acEl.style.display = 'block';
+  acEl.style.left = (rect.left + 20) + 'px';
+  acEl.style.top = (rect.top + 40) + 'px';
+  acEl.innerHTML = '';
+  matches.forEach((n, i) => {
+    const div = document.createElement('div');
+    div.className = 'ac-item' + (i === 0 ? ' selected' : '');
+    div.dataset.title = n.title;
+    div.textContent = n.title;
+    div.onclick = () => insertAC(n.title);
+    acEl.appendChild(div);
+  });
+}
+
+function hideAC() {
+  acEl.style.display = 'none';
+  acState = null;
+}
+
+function insertAC(title) {
+  if (!acState) return;
+  const before = noteTextarea.value.substring(0, acState.start);
+  const after = noteTextarea.value.substring(noteTextarea.selectionStart);
+  const insert = title + ']]';
+  noteTextarea.value = before + insert + after;
+  noteTextarea.selectionStart = noteTextarea.selectionEnd = acState.start + insert.length;
+  hideAC();
+  onNoteContentChange();
+}
+
+// ===========================
+// EDITOR EVENTS
+// ===========================
+noteTitleInput.addEventListener('input', () => {
+  if (!activeTab) return;
+  updateNote(activeTab, { title: noteTitleInput.value });
+  renderTabs();
+  renderFileExplorer();
+  sbNoteName.textContent = noteTitleInput.value;
+  notify(t('saved'));
+  if (graphOpen) { buildGraphData(); drawGraph(); }
+});
+
+noteTextarea.addEventListener('input', onNoteContentChange);
+
+function onNoteContentChange() {
+  if (!activeTab) return;
+  updateNote(activeTab, { content: noteTextarea.value });
+  updateMeta();
+  updatePreview();
+  renderBacklinks(activeTab);
+  renderOutline(noteTextarea.value);
+  renderTagsPanel();
+  if (graphOpen) { buildGraphData(); drawGraph(); }
+}
+
+// Auto-save on each keystroke with debounce
+let saveTimer;
+noteTextarea.addEventListener('input', () => {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => notify(t('saved')), 1000);
+});
+
+// Editor toolbar
+document.querySelectorAll('.toolbar-btn[data-fmt]').forEach(btn => {
+  btn.onclick = () => formatText(btn.dataset.fmt);
+});
+
+function formatText(fmt) {
+  const ta = noteTextarea;
+  const start = ta.selectionStart, end = ta.selectionEnd;
+  const sel = ta.value.substring(start, end);
+  let before = ta.value.substring(0, start);
+  let after = ta.value.substring(end);
+  let insert = '', cursor = 0;
+
+  switch (fmt) {
+    case 'bold': insert = `**${sel || 'bold text'}**`; cursor = sel ? insert.length : 2; break;
+    case 'italic': insert = `*${sel || 'italic text'}*`; cursor = sel ? insert.length : 1; break;
+    case 'strike': insert = `~~${sel || 'text'}~~`; cursor = sel ? insert.length : 2; break;
+    case 'code': insert = `\`${sel || 'code'}\``; cursor = sel ? insert.length : 1; break;
+    case 'h1': insert = `# ${sel || 'Heading 1'}`; cursor = insert.length; break;
+    case 'h2': insert = `## ${sel || 'Heading 2'}`; cursor = insert.length; break;
+    case 'h3': insert = `### ${sel || 'Heading 3'}`; cursor = insert.length; break;
+    case 'ul': insert = `\n- ${sel || 'item'}\n`; cursor = insert.length - 1; break;
+    case 'ol': insert = `\n1. ${sel || 'item'}\n`; cursor = insert.length - 1; break;
+    case 'task': insert = `\n- [ ] ${sel || 'task'}\n`; cursor = insert.length - 1; break;
+    case 'quote': insert = `\n> ${sel || 'quote'}\n`; cursor = insert.length - 1; break;
+    case 'link': insert = `[${sel || 'link text'}](url)`; cursor = insert.length - 1; break;
+    case 'wikilink': insert = `[[${sel || 'note name'}]]`; cursor = sel ? insert.length : insert.length - 2; break;
+    default: return;
+  }
+
+  ta.value = before + insert + after;
+  ta.selectionStart = ta.selectionEnd = start + cursor;
+  ta.focus();
+  onNoteContentChange();
+}
+
+// Mode toggle
+document.getElementById('mode-edit').onclick = () => { editorMode = 'edit'; applyEditorMode(); };
+document.getElementById('mode-preview').onclick = () => { editorMode = 'preview'; applyEditorMode(); updatePreview(); };
+document.getElementById('mode-split').onclick = () => { editorMode = 'split'; applyEditorMode(); updatePreview(); };
+
+// ===========================
+// NEW NOTE
+// ===========================
+const TEMPLATES = {
+  daily: () => {
+    const d = new Date();
+    return `# Daily Note — ${d.toLocaleDateString()}\n\n## Tasks\n- [ ] \n\n## Notes\n\n## Journal\n`;
+  },
+  meeting: () => `# Meeting Notes\n\n**Date:** ${new Date().toLocaleDateString()}\n**Attendees:** \n**Goal:** \n\n## Agenda\n1. \n\n## Notes\n\n## Action Items\n- [ ] \n`,
+  project: () => `# Project: \n\n**Status:** Active\n**Goal:** \n**Deadline:** \n\n## Overview\n\n## Tasks\n- [ ] \n\n## Links\n- [[Related Note]]\n`
+};
+
+function openNewNoteModal() {
+  document.getElementById('modal-new-note').classList.add('active');
+  document.getElementById('new-note-title').value = '';
+  document.getElementById('new-note-template').value = '';
+  setTimeout(() => document.getElementById('new-note-title').focus(), 50);
+}
+
+document.getElementById('btn-new-note').onclick = openNewNoteModal;
+document.getElementById('btn-new-note2').onclick = openNewNoteModal;
+document.getElementById('btn-new-note3').onclick = openNewNoteModal;
+document.getElementById('btn-cancel-new').onclick = () => document.getElementById('modal-new-note').classList.remove('active');
+document.getElementById('btn-confirm-new').onclick = () => {
+  const title = document.getElementById('new-note-title').value.trim() || t('newNote');
+  const tpl = document.getElementById('new-note-template').value;
+  const content = tpl && TEMPLATES[tpl] ? TEMPLATES[tpl]() : '';
+  const note = createNote(title, content);
+  document.getElementById('modal-new-note').classList.remove('active');
+  renderAll();
+  openNote(note.id);
+};
+document.getElementById('new-note-title').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('btn-confirm-new').click();
+  if (e.key === 'Escape') document.getElementById('btn-cancel-new').click();
+});
+document.getElementById('modal-new-note').addEventListener('click', e => {
+  if (e.target === document.getElementById('modal-new-note'))
+    document.getElementById('modal-new-note').classList.remove('active');
+});
+
+// ===========================
+// CLEAR ALL DATA
+// ===========================
+document.getElementById('btn-clear-all').onclick = () => {
+  document.getElementById('modal-confirm-clear').classList.add('active');
+};
+document.getElementById('btn-cancel-clear').onclick = () => {
+  document.getElementById('modal-confirm-clear').classList.remove('active');
+};
+document.getElementById('btn-confirm-clear').onclick = () => {
+  notes = {};
+  saveNotes(notes);
+  openTabs = [];
+  activeTab = null;
+  tagFilter = null;
+  document.getElementById('modal-confirm-clear').classList.remove('active');
+  if (graphOpen) closeGraph();
+  renderAll();
+  showEmptyState();
+  notify(t('cleared'));
+};
+document.getElementById('modal-confirm-clear').addEventListener('click', e => {
+  if (e.target === document.getElementById('modal-confirm-clear'))
+    document.getElementById('modal-confirm-clear').classList.remove('active');
+});
+
+// ===========================
+// SIDEBAR TABS
+// ===========================
+document.querySelectorAll('.sidebar-tab').forEach(tab => {
+  tab.onclick = () => {
+    document.querySelectorAll('.sidebar-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.sidebar-panel').forEach(p => p.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById('panel-' + tab.dataset.tab).classList.add('active');
+  };
+});
+
+// ===========================
+// RIGHT PANEL TABS
+// ===========================
+document.querySelectorAll('.panel-tab').forEach(tab => {
+  tab.onclick = () => {
+    document.querySelectorAll('.panel-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.panel-content').forEach(p => p.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById('pc-' + tab.dataset.panel).classList.add('active');
+  };
+});
+
+// ===========================
+// TOGGLE BUTTONS
+// ===========================
+document.getElementById('btn-toggle-right').onclick = () => {
+  document.getElementById('right-panel').classList.toggle('collapsed');
+};
+
+document.getElementById('btn-graph').onclick = () => {
+  if (graphOpen) closeGraph();
+  else openGraph();
+};
+
+document.getElementById('btn-quick-open').onclick = openQuickSwitcher;
+
+// ===========================
+// THEME
+// ===========================
+let currentTheme = localStorage.getItem('zk-theme') || 'dark';
+function applyTheme() {
+  document.documentElement.setAttribute('data-theme', currentTheme === 'light' ? 'light' : '');
+  document.getElementById('btn-toggle-theme').textContent = currentTheme === 'light' ? '☾' : '☀';
+  if (graphOpen) drawGraph();
+}
+document.getElementById('btn-toggle-theme').onclick = () => {
+  currentTheme = currentTheme === 'light' ? 'dark' : 'light';
+  localStorage.setItem('zk-theme', currentTheme);
+  applyTheme();
+};
+
+// ===========================
+// LANGUAGE TOGGLE
+// ===========================
+document.getElementById('lang-toggle').onclick = () => {
+  currentLang = currentLang === 'en' ? 'ru' : 'en';
+  localStorage.setItem('zk-lang', currentLang);
+  applyI18n();
+  renderAll();
+};
+
+// ===========================
+// KEYBOARD SHORTCUTS
+// ===========================
+document.addEventListener('keydown', e => {
+  const ctrl = e.ctrlKey || e.metaKey;
+  if (ctrl && e.key === 'n') { e.preventDefault(); openNewNoteModal(); }
+  if (ctrl && e.key === 'p') { e.preventDefault(); openQuickSwitcher(); }
+  if (ctrl && e.key === 'g') { e.preventDefault(); document.getElementById('btn-graph').click(); }
+  if (ctrl && e.key === 'f') { e.preventDefault(); document.querySelector('.sidebar-tab[data-tab="search"]').click(); document.getElementById('sidebar-search-input').focus(); }
+  if (ctrl && e.key === 's') { e.preventDefault(); if (activeTab) notify(t('saved')); }
+  if (ctrl && e.key === 'b' && activeTab) { e.preventDefault(); formatText('bold'); }
+  if (ctrl && e.key === 'i' && activeTab) { e.preventDefault(); formatText('italic'); }
+  if (e.key === 'Escape') {
+    document.querySelectorAll('.modal-overlay.active').forEach(m => m.classList.remove('active'));
+    hideAC();
+  }
+  // Tab cycling
+  if (ctrl && e.key === 'Tab') {
+    e.preventDefault();
+    if (!openTabs.length) return;
+    const idx = openTabs.indexOf(activeTab);
+    const next = openTabs[(idx + 1) % openTabs.length];
+    activateTab(next);
+  }
+});
+
+// ===========================
+// GITHUB SYNC
+// ===========================
+document.getElementById('btn-github').onclick = () => {
+  document.querySelectorAll('.panel-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.panel-content').forEach(p => p.classList.remove('active'));
+  document.querySelector('.panel-tab[data-panel="github"]').classList.add('active');
+  document.getElementById('pc-github').classList.add('active');
+  // Expand right panel if collapsed
+  document.getElementById('right-panel').classList.remove('collapsed');
+};
+
+// Prefill from saved config
+if (ghConfig) {
+  document.getElementById('gh-token').value = ghConfig.token || '';
+  document.getElementById('gh-owner').value = ghConfig.owner || '';
+  document.getElementById('gh-repo').value = ghConfig.repo || '';
+  document.getElementById('gh-branch').value = ghConfig.branch || 'main';
+}
+
+document.getElementById('btn-gh-connect').onclick = async () => {
+  const token = document.getElementById('gh-token').value.trim();
+  const owner = document.getElementById('gh-owner').value.trim();
+  const repo = document.getElementById('gh-repo').value.trim();
+  const branch = document.getElementById('gh-branch').value.trim() || 'main';
+
+  if (!token || !owner || !repo) return;
+
+  const statusEl = document.getElementById('gh-status');
+  statusEl.innerHTML = '<span style="color:var(--text2)">Connecting...</span>';
+
+  try {
+    const res = await fetch(`https://api.github.com/repos/${owner}/${repo}`, {
+      headers: { Authorization: `token ${token}`, Accept: 'application/vnd.github.v3+json' }
+    });
+    if (!res.ok) throw new Error('Auth failed');
+    ghConfig = { token, owner, repo, branch };
+    localStorage.setItem('zk-gh-config', JSON.stringify(ghConfig));
+    statusEl.innerHTML = `<div class="github-status ok">✓ ${t('connected')}</div>`;
+    document.getElementById('gh-actions').style.display = 'block';
+    document.getElementById('sb-storage').textContent = 'GitHub';
+    notify(t('connected'));
+  } catch {
+    statusEl.innerHTML = `<div class="github-status err">✕ ${t('connectError')}</div>`;
+  }
+};
+
+if (ghConfig) {
+  document.getElementById('gh-status').innerHTML = `<div class="github-status ok">✓ ${t('connected')}</div>`;
+  document.getElementById('gh-actions').style.display = 'block';
+  document.getElementById('sb-storage').textContent = 'GitHub';
+}
+
+async function ghRequest(path, opts = {}) {
+  const url = `https://api.github.com${path}`;
+  const res = await fetch(url, {
+    ...opts,
+    headers: {
+      Authorization: `token ${ghConfig.token}`,
+      Accept: 'application/vnd.github.v3+json',
+      'Content-Type': 'application/json',
+      ...(opts.headers || {})
+    }
+  });
+  if (!res.ok) throw new Error(`GitHub API error: ${res.status}`);
+  return res.json();
+}
+
+document.getElementById('btn-gh-push').onclick = async () => {
+  if (!ghConfig) return;
+  try {
+    const content = btoa(unescape(encodeURIComponent(JSON.stringify(notes, null, 2))));
+    const path = `/repos/${ghConfig.owner}/${ghConfig.repo}/contents/zk-notes.json`;
+    let sha;
+    try {
+      const existing = await ghRequest(path + `?ref=${ghConfig.branch}`);
+      sha = existing.sha;
+    } catch {}
+    const body = { message: 'ZK: update notes', content, branch: ghConfig.branch };
+    if (sha) body.sha = sha;
+    await ghRequest(path, { method: 'PUT', body: JSON.stringify(body) });
+    notify(t('pushSuccess'));
+  } catch {
+    notify(t('pushError'));
+  }
+};
+
+document.getElementById('btn-gh-pull').onclick = async () => {
+  if (!ghConfig) return;
+  try {
+    const path = `/repos/${ghConfig.owner}/${ghConfig.repo}/contents/zk-notes.json?ref=${ghConfig.branch}`;
+    const data = await ghRequest(path);
+    const decoded = decodeURIComponent(escape(atob(data.content)));
+    notes = JSON.parse(decoded);
+    saveNotes(notes);
+    openTabs = openTabs.filter(id => notes[id]);
+    if (!notes[activeTab]) activeTab = null;
+    renderAll();
+    if (activeTab) showEditor(activeTab);
+    else showEmptyState();
+    notify(t('pullSuccess'));
+  } catch {
+    notify(t('pullError'));
+  }
+};
+
+// ===========================
+// RESIZABLE PANELS
+// ===========================
+function makeResizer(el, targetEl, side = 'left') {
+  let startX, startW;
+  el.addEventListener('mousedown', e => {
+    startX = e.clientX;
+    startW = targetEl.offsetWidth;
+    const onMove = (e) => {
+      const dx = e.clientX - startX;
+      const newW = side === 'left' ? startW + dx : startW - dx;
+      targetEl.style.width = Math.max(160, Math.min(480, newW)) + 'px';
+    };
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  });
+}
+makeResizer(document.getElementById('left-resizer'), document.getElementById('sidebar'), 'left');
+makeResizer(document.getElementById('right-resizer'), document.getElementById('right-panel'), 'right');
+
+// ===========================
+// WINDOW RESIZE
+// ===========================
+window.addEventListener('resize', () => {
+  if (graphOpen) { resizeGraph(); drawGraph(); }
+});
+
+// ===========================
+// RENDER ALL
+// ===========================
+function renderAll() {
+  renderFileExplorer();
+  renderTagsPanel();
+  if (activeTab && notes[activeTab]) {
+    renderBacklinks(activeTab);
+    renderOutline(noteTextarea.value);
+  }
+}
+
+// ===========================
+// INIT
+// ===========================
+function init() {
+  applyTheme();
+  applyI18n();
+  renderAll();
+
+  // Open last active note
+  const lastId = localStorage.getItem('zk-last-note');
+  if (lastId && notes[lastId]) {
+    openNote(lastId);
+  } else if (Object.keys(notes).length === 0) {
+    // Create sample notes on first run
+    const welcome = createNote('Welcome to ZK', [
+      '# Welcome to ZK — Zettelkasten',
+      '',
+      'ZK is a browser-based Zettelkasten inspired by Obsidian.',
+      '',
+      '## Features',
+      '- **Wikilinks**: Connect notes using [[Note Title]] syntax',
+      '- **Graph View**: Visualize connections between notes',
+      '- **Tags**: Use #tags to categorize notes',
+      '- **Backlinks**: See all notes that link to this one',
+      '- **Markdown**: Full markdown support',
+      '- **GitHub Sync**: Save notes to your GitHub repository',
+      '',
+      '## Getting Started',
+      '1. Create a new note with **Ctrl+N**',
+      '2. Link notes with `[[Note Title]]`',
+      '3. Open the graph with **Ctrl+G**',
+      '4. Search with **Ctrl+F** or **Ctrl+P**',
+      '',
+      'See also: [[ZK Guide]] | [[Markdown Reference]]',
+      '',
+      '#welcome #zettelkasten #start',
+    ].join('\n'));
+
+    const guide = createNote('ZK Guide', [
+      '# ZK Guide',
+      '',
+      '## Keyboard Shortcuts',
+      '| Shortcut | Action |',
+      '|----------|--------|',
+      '| Ctrl+N | New Note |',
+      '| Ctrl+P | Quick Open |',
+      '| Ctrl+G | Toggle Graph |',
+      '| Ctrl+F | Search |',
+      '| Ctrl+S | Save |',
+      '| Ctrl+B | Bold |',
+      '| Ctrl+I | Italic |',
+      '| Ctrl+Tab | Next Tab |',
+      '',
+      '## Linking Notes',
+      'Use double brackets to link: [[Welcome to ZK]]',
+      '',
+      '## Tags',
+      'Add tags anywhere in a note: #idea #project #person',
+      '',
+      '#guide #help',
+    ].join('\n'));
+
+    const markdownRef = createNote('Markdown Reference', [
+      '# Markdown Reference',
+      '',
+      '## Text Formatting',
+      '**Bold** | *Italic* | ~~Strikethrough~~ | `Code`',
+      '',
+      '## Headings',
+      '# H1, ## H2, ### H3',
+      '',
+      '## Lists',
+      '- Unordered item',
+      '1. Ordered item',
+      '- [ ] Task item',
+      '- [x] Completed task',
+      '',
+      '## Links',
+      '[[Internal Link]] | [External](https://example.com)',
+      '',
+      '## Blockquote',
+      '> This is a quote',
+      '',
+      '## Code Block',
+      '```javascript',
+      'const hello = "world";',
+      '```',
+      '',
+      '## Table',
+      '| Column 1 | Column 2 |',
+      '|----------|----------|',
+      '| Cell 1   | Cell 2   |',
+      '',
+      '#markdown #reference',
+    ].join('\n'));
+
+    saveNotes(notes);
+    renderAll();
+    openNote(welcome.id);
+  }
+}
+
+// Save last open note on unload
+window.addEventListener('beforeunload', () => {
+  if (activeTab) localStorage.setItem('zk-last-note', activeTab);
+});
+
+init();
+</script>
+</body>
+</html>
